@@ -68,51 +68,40 @@ def get_album_metadata(page)
   metadata
 end
 
-def get_albums(page_id)
-  return {} if page_id.nil? || page_id.empty?
-
-  albums = {}
-  url = "http://graph.facebook.com/#{page_id}?fields=albums"
-  loop do
-    puts "Fetching album data from: #{url}"
-    page = get_page(url)
-
-    break if page.nil?
-
-    albums.merge!(get_album_metadata(page))
-    url = page['next_url']
-  end
-
-  albums
+def get_metadata(page, fields)
+  return get_album_metadata(page) if fields == 'albums'
+  return get_image_data(page) if fields == 'photos'
+  return {}
 end
 
-def get_photos(album_id)
-  return if album_id.nil? || album_id.empty?
+def get_hypermedia(id, fields)
+  return {} if id.nil? || id.empty? || fields.nil? || fields.empty?
 
-  #photos = {}
-  url = "http://graph.facebook.com/#{album_id}?fields=photos"
+  results = {}
+  url = "http://graph.facebook.com/#{id}?fields=#{fields}"
   loop do
-    puts "Fetching image data from: #{url}"
+    puts "Fetching #{fields.chomp('s')} data from: #{url}"
     page = get_page(url)
 
     break if page.nil?
 
-    #photos.merge!(get_image_data(page))
-    photos = get_image_data(page)
+    # TODO: If items in new_results have key 'source', download the source
+    new_results = get_metadata(page, fields)
+    puts "Found #{new_results.size} results"
+    results.merge!(new_results)
     url = page['next_url']
-
-    # TODO: Actually download the photos
-    puts JSON.pretty_generate(photos)
   end
+
+  results
 end
 
 # Given a page-id and album name (e.g. 'Timeline Photos'), get the album-id
 url = 'http://www.facebook.com/pages/Grandiloquent-Word-of-the-Day/479146505433648'
 page_id = url.split('/').last
 
-albums = get_albums(page_id)
+albums = get_hypermedia(page_id, 'albums')
 puts 'Found the following albums:'
 puts JSON.pretty_generate(albums)
 
 album_id = albums['Timeline Photos']
-get_photos(album_id)
+get_hypermedia(album_id, 'photos')
