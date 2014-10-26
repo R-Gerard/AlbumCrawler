@@ -17,6 +17,7 @@
 require 'fileutils'
 require 'open-uri'
 require 'json'
+require 'cgi'
 
 def download(items)
   FileUtils.mkdir_p('out')
@@ -33,16 +34,22 @@ def download(items)
   puts ''
 end
 
-def get_page(url)
-  return nil if url.nil? || url.empty?
+def get_page(url, limit=32, message='', retry_count=0)
+  return nil if url.nil? || url.empty? || limit == 0
+
+  # The Graph API's hypermedia sets the results limit to 25, so we will adjust it as we see fit
+  uri = URI.parse(url)
+  query = CGI::parse(uri.query)
+  query['limit'] = limit if query.has_key?('limit')
+  uri.query = URI.encode_www_form(query)
+
+  puts message.rstrip + ' ' + uri.to_s
 
   begin
-    page = JSON.parse(open(URI.encode(url)).read)
+    page = JSON.parse(uri.open.read)
   rescue Exception => e
-    # For some reason the last page has a "next" link that doesn't work
-    puts e.message
-    puts e.backtrace
-    return nil
+    # The Graph API's pagination is slightly broken; if we request more results than what actually exists we get a 400 error back
+    return get_page(url, limit / 2, 'Request failed. Retrying with:', retry_count + 1)
   end
 
   # The first page's data is wrapped in a "photos" or "albums" element
@@ -52,7 +59,7 @@ def get_page(url)
   data = page['data'] || []
   next_url = page.has_key?('paging') ? page['paging']['next'] : nil
 
-  Hash['data', data, 'next_url', next_url]
+  Hash['data', data, 'next_url', next_url, 'retry_count', retry_count]
 end
 
 def get_image_data(page)
@@ -93,15 +100,18 @@ end
 def get_hypermedia(id, fields)
   return {} if id.nil? || id.empty? || fields.nil? || fields.empty?
 
+  limit = 64
   results = {}
   url = "http://graph.facebook.com/#{id}?fields=#{fields}"
   loop do
-    puts "Fetching #{fields.chomp('s')} data from: #{url}"
-    page = get_page(url)
+    break if url.nil? || url.empty?
+
+    page = get_page(url, limit, "Fetching #{fields.chomp('s')} data from:")
 
     break if page.nil?
 
     new_results = get_metadata(page, fields)
+    limit = new_results.size if page['retry_count'] > 0
     puts "Found #{new_results.size} results"
     results.merge!(new_results)
     url = page['next_url']
@@ -122,3 +132,5 @@ puts JSON.pretty_generate(albums)
 
 album_id = albums['Timeline Photos']
 get_hypermedia(album_id, 'photos')
+
+puts 'All done!'
