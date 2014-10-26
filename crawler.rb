@@ -70,6 +70,8 @@ def get_image_data(page)
     begin
       name = item['name'].split("\n").select { |line| line.downcase.include?('grandiloquent word of the day:') }.first.split(':').last.strip
     rescue
+      # Default to the unique image-id
+      # Note: you can view this image on Facebook at "http://www.facebook.com/photo.php?fbid=#{id}"
       name = item['id']
     end
     images[name] = item['source']
