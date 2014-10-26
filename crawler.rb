@@ -99,6 +99,9 @@ def get_metadata(page, fields)
   return {}
 end
 
+# Traverses a graph and returns metadata about the contents
+#  -OR-
+# Downloads the contents if the fields are photos
 def get_hypermedia(id, fields)
   return {} if id.nil? || id.empty? || fields.nil? || fields.empty?
 
@@ -115,10 +118,13 @@ def get_hypermedia(id, fields)
     new_results = get_metadata(page, fields)
     limit = new_results.size if page['retry_count'] > 0
     puts "Found #{new_results.size} results"
-    results.merge!(new_results)
     url = page['next_url']
 
-    download(new_results) if fields == 'photos'
+    if fields == 'photos'
+      download(new_results)
+    else
+      results.merge!(new_results)
+    end
   end
 
   results
