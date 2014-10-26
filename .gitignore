@@ -1,3 +1,7 @@
+## App-specific ignores
+out/
+
+## GitHub-generated ignores for Ruby
 *.gem
 *.rbc
 /.config

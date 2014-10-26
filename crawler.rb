@@ -14,8 +14,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+require 'fileutils'
 require 'open-uri'
 require 'json'
+
+def download(items)
+  FileUtils.mkdir_p('out')
+
+  items.each do |name, source|
+    print '.'
+    $stdout.flush
+    next if File.exists?("out/#{name}.jpg")
+
+    open("out/#{name}.jpg", 'wb') do |file|
+      file << open(source).read
+    end
+  end
+  puts ''
+end
 
 def get_page(url)
   return nil if url.nil? || url.empty?
@@ -85,11 +101,12 @@ def get_hypermedia(id, fields)
 
     break if page.nil?
 
-    # TODO: If items in new_results have key 'source', download the source
     new_results = get_metadata(page, fields)
     puts "Found #{new_results.size} results"
     results.merge!(new_results)
     url = page['next_url']
+
+    download(new_results) if fields == 'photos'
   end
 
   results
