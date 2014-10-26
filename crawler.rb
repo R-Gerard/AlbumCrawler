@@ -19,19 +19,34 @@ require 'open-uri'
 require 'json'
 require 'cgi'
 
+def print_n(string)
+  print string
+  $stdout.flush
+end
+
 def download(items)
   FileUtils.mkdir_p('out')
 
+  messages = []
   items.each do |name, source|
-    print '.'
-    $stdout.flush
-    next if File.exists?("out/#{name}.jpg")
+    if File.exists?("out/#{name}.jpg")
+      print_n '.'
+      next
+    end
 
-    open("out/#{name}.jpg", 'wb') do |file|
-      file << open(source).read
+    begin
+      open("out/#{name}.jpg", 'wb') do |file|
+        file << open(source).read
+      end
+
+      print_n '.'
+    rescue Exception => e
+      messages << "Failed to download #{name} (#{e.message})"
+      print_n 'X'
     end
   end
   puts ''
+  puts messages.join("\n") unless messages.empty?
 end
 
 def get_page(url, limit=32, message='', retry_count=0)
@@ -49,6 +64,7 @@ def get_page(url, limit=32, message='', retry_count=0)
     page = JSON.parse(uri.open.read)
   rescue Exception => e
     # The Graph API's pagination is slightly broken; if we request more results than what actually exists we get a 400 error back
+    # It will also fail if the request size is too large (e.g. a small number of photos with thousands of 'likes')
     return get_page(url, limit / 2, 'Request failed. Retrying with:', retry_count + 1)
   end
 
@@ -131,7 +147,9 @@ def get_hypermedia(id, fields)
 end
 
 # Given a page-id and album name (e.g. 'Timeline Photos'), get the album-id
+# TODO: Use 'http://graph.facebook.com/search?q=#{name}&type=page' to find the page-id (requires a valid access_token)
 url = 'http://www.facebook.com/pages/Grandiloquent-Word-of-the-Day/479146505433648'
+#url = 'http://www.facebook.com/IFeakingLoveScience/367116489976035'
 page_id = url.split('/').last
 
 albums = get_hypermedia(page_id, 'albums')
